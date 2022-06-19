@@ -1,0 +1,221 @@
+---
+title: "Ec/ACM/CS 112 - PS5"
+author: "Ben Juarez"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Question 1
+
+## preliminaries
+```{r}
+rm(list=ls())
+```
+
+## Step 1
+```{r}
+TargetDtbn = function(theta) {
+  theta1 = theta[1]
+  theta2 = theta[2]
+  if (theta1 < 0 || theta1 > 1 || theta2 < 0 || theta2 > 1) {
+    return(0)
+  } else if (theta2 >= theta1 && theta2 <= 1 - theta1) {
+    return(6 * theta1)
+  } else if (theta2 <= theta1 && theta2 <= 1 - theta1) {
+    return(6 * theta2)
+  } else if (theta2 >= theta1 && theta2 >= 1 - theta1) {
+    return(3 - 6 * (theta2 - 0.5))
+  } else if (theta2 <= theta1 && theta2 >= 1 - theta1) {
+    return(3 - 6 * (theta1 - 0.5))
+  } else {
+    print("Error")
+    return(0)
+  }
+}
+
+library(mvtnorm)
+SampleProposalDtbn = function(theta_t) {
+  sigma = diag(length(theta_t)) * sigma_squared
+  return(rmvnorm(1, theta_t, sigma))
+}
+
+DensityProposalDtbn = function(theta, thetaPrime) {
+  sigma = diag(length(theta)) * sigma_squared
+  return(dmvnorm(thetaPrime, theta, sigma))
+}
+
+MHsampling = function(targetFunc, sampleFunc, densityFunc, num_samples, 
+                      theta0) {
+  sample_matrix = matrix(rep(-1), nrow = num_samples, ncol = length(theta0))
+  stopifnot(sampleFunc(theta0) > 0)
+  t_prev = theta0
+  for (i in 1:n) {
+    t_i = sampleFunc(t_prev)
+    r = (targetFunc(t_i)/densityFunc(t_prev, t_i)) / 
+      (targetFunc(t_prev)/densityFunc(t_i, t_prev))
+    p = min(r,1)
+    if (sample(x = c(-1, 1), size = 1, prob = c(p, 1-p)) < 0) {
+      sample_matrix[i,] = t_i
+      t_prev = t_i
+    } else {
+      sample_matrix[i,] = t_prev
+    }
+    if (i %% 50000 == 0) {
+      print(paste("step", i, "out of", num_samples, "completed"))
+    }
+  }
+  return(sample_matrix)
+}
+```
+
+
+## Step 2
+```{r}
+sigma_squared = 0.25
+n = 250000
+MHsamples = MHsampling(targetFunc = TargetDtbn, 
+                       sampleFunc = SampleProposalDtbn,
+                       densityFunc = DensityProposalDtbn, 
+                       num_samples = n,
+                       theta0 = c(0.5, 0.5))
+plot(MHsamples[,1], MHsamples[,2], xlab = "theta1", ylab = "theta2",
+     col = rgb(red=0.0, green=0.0, blue=1.0, alpha=0.0075))
+```
+
+## Step 3
+```{r}
+theta1 = MHsamples[,1]
+theta2 = MHsamples[,2]
+hist(theta1, xlab = "theta1", prob = TRUE, col = "light blue", breaks = 100)
+theta1s = seq(0,1,length = length(theta1))
+lines(theta1s, 6 * theta1s)
+lines(theta1s, 3 - 6 * (theta1s - 0.5))
+```
+
+## Step 4
+```{r}
+paste("Mean of theta1:", round(mean(theta1),4))
+paste("Mean of theta2:", round(mean(theta2),4))
+paste("Variance of theta1:", round(var(theta1),4))
+paste("Variance of theta2:", round(var(theta2),4))
+paste("Covariance of theta1 and theta2:", cov(theta1, theta2))
+```
+
+
+# Question 2
+
+## preliminaries
+```{r}
+data = read.csv("~/Desktop/Wages1.csv")
+X = data$X
+wage = data$wage
+schooling = data$school
+experience = data$exper
+sex = data$sex
+```
+
+## Step 1
+```{r}
+TargetDtbn2 = function(theta) {
+  beta0 = theta[1]
+  betaSC = theta[2]
+  betaEC = theta[3]
+  sigma = theta[4]
+  loglike = sum(log(dnorm(log(wage)-beta0-betaSC*schooling-betaEC*experience,
+                          mean = 0, sd = sigma)))
+  return(loglike * (1/sigma^2))
+}
+
+library(mvtnorm)
+SampleProposalDtbn2 = function(theta) {
+  sigma = rnorm(1, theta[4], sigma_squared)
+  while (sigma < 0) {
+   sigma = rnorm(1, theta[4], sigma_squared) 
+  }
+  return(c(
+    rnorm(1, theta[1], sigma_squared),
+    rnorm(1, theta[2], sigma_squared),
+    rnorm(1, theta[3], sigma_squared),
+    sigma
+  ))
+}
+
+DensityProposalDtbn2 = function(theta, thetaPrime) {
+  sig = diag(length(theta)) * sigma_squared
+  return(dmvnorm(thetaPrime, theta, sig))
+}
+
+MHsampling2 = function(targetFunc, sampleFunc, densityFunc, num_samples, theta0) {
+  sample_matrix = matrix(rep(-1), nrow = num_samples, ncol = length(theta0))
+  t_prev = theta0
+  for (i in 1:n) {
+    t_i = sampleFunc(t_prev)
+    r = (targetFunc(t_i)/densityFunc(t_prev, t_i)) /
+      (targetFunc(t_prev)/densityFunc(t_i, t_prev))
+    if (r == Inf) {
+      p = 0
+    } else {
+      p = min(r,1)
+    }
+    if (sample(x = c(-1, 1), size = 1, prob = c(p, 1-p)) < 0) {
+      sample_matrix[i,] = t_i
+      t_prev = t_i
+    } else {
+      sample_matrix[i,] = t_prev
+    }
+    if (i %% 50000 == 0) {
+      print(paste("step", i, "out of", num_samples, "completed"))
+    }
+  }
+  return(sample_matrix)
+}
+```
+
+## Step 2
+```{r}
+sigma_squared = 0.05
+schooling = schooling - mean(schooling)
+experience = experience - mean(experience)
+n = 510000
+MHsamples2 = MHsampling2(targetFunc = TargetDtbn2, 
+                       sampleFunc = SampleProposalDtbn2,
+                       densityFunc = DensityProposalDtbn2, 
+                       num_samples = n,
+                       theta0 = c(1.6, 0.11, 0.4, 0.6))
+```
+```{r}
+ole = lm(log(wage) ~ schooling + experience)
+beta0_Hat = coef(ole)[1]
+betaSC_Hat = coef(ole)[2]
+betaEC_Hat = coef(ole)[3]
+
+
+beta0 = MHsamples2[10000:n, 1]
+hist(beta0, prob = TRUE, breaks = 100, col = "peachpuff")
+abline(v = mean(beta0), col = "blue", lwd = 3)
+abline(v = beta0_Hat, col = "red", lwd = 3)
+
+betaSC = MHsamples2[10000:n, 2]
+hist(betaSC, prob = TRUE, breaks = 100, col = "peachpuff")
+abline(v = mean(betaSC), col = "blue", lwd = 3)
+abline(v = betaSC_Hat, col = "red", lwd = 3)
+
+betaEC = MHsamples2[10000:n, 3]
+hist(betaEC, prob = TRUE, breaks = 100, col = "peachpuff")
+abline(v = mean(betaEC), col = "blue", lwd = 3)
+abline(v = betaEC_Hat, col = "red", lwd = 3)
+
+sigma = MHsamples2[10000:n, 4]
+hist(sigma, prob = TRUE, breaks = 100, col = "peachpuff")
+abline(v = mean(sigma), col = "blue", lwd = 3)
+```
+
+
+## Step 3
+```{r}
+paste("Standard deviation of P(beta0 | data):", round(sd(beta0),3))
+paste("Standard deviation of P(betaSC | data):", round(sd(betaSC),3))
+paste("Standard deviation of P(betaEC | data):", round(sd(betaEC),3))
+paste("Posterior correlation between betaSC and betaEC:", round(cor(betaSC, betaEC),3))
+```

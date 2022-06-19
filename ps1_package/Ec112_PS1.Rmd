@@ -1,0 +1,101 @@
+---
+title: "Ec/ACM/CS 112. Problem Set 1."
+author: "Ben Juarez"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+# Step 1: Programming stochastic simulations
+
+## 1.A
+```{r}
+x1 = rnorm(1000, 10, 10)
+x2 = rnorm(1000, 10, 10)
+plot(x1, x2, main = "random seed unspecified", pch = 16, xlim = c(-50,50), ylim = c(-50,50), col = rgb(1,0,0,.3))
+abline(v = mean(x1), lty=2)
+abline(h = mean(x2), lty=2)
+text(-37, -8, paste("mean x1 = ", round(mean(x1), 2)))
+text(-34, -15, paste("mean x2 = ", round(mean(x2), 2)))
+```
+## 1.B
+```{r}
+set.seed(2021)
+x1 = rnorm(1000, 10, 10)
+set.seed(2021)
+x2 = rnorm(1000, 10, 10)
+plot(x1, x2, main = "random seed specified", pch = 16, xlim = c(-50,50), ylim = c(-50,50), col = rgb(1,0,0,.3))
+abline(a = 0, b = 1, lty=2)
+text(-37, -8, paste("mean x1 = ", round(mean(x1), 2)))
+text(-34, -15, paste("mean x2 = ", round(mean(x2), 2)))
+```
+# Step 2: Simulating the hot-hand in basketball
+
+## 2.A
+```{r}
+simulate_player = function(p) {
+  return(unlist(rbinom(25, 1, p)))
+}
+
+count_sequence = function(l) {
+  streaks = list()
+  
+  for (i in 1:length(l)) {
+    streak = 0
+    for (j in i:length(l)) {
+      if (l[j] == 0) {
+        break
+      }
+      streak = streak + 1
+    }
+    streaks[[i]] = streak
+  }
+  
+  return(max(unlist(streaks)))
+}
+```
+
+## 2.B
+```{r}
+x = c()
+set.seed(2021)
+for (i in 1:10000) {
+  x[i] = count_sequence(simulate_player(.5))
+  
+}
+hist(x, col = "white", main = "Distribution of longest streaks", xlab = "size of longest streak", ylab = "", ylim = c(0,3000))
+# axis(2, at = c(500, 1500, 2500), labels = c(500, 1500, 2500))
+abline(v = mean(x), lty = 2, lwd = 2, col = "red")
+text(10, 1000, paste("mean = ", round(mean(x), 2)))
+text(10, 800, paste("min = ", min(x)))
+text(10, 600, paste("max = ", max(x)))
+```
+
+## 2.C
+```{r}
+pHit = replicate(16,.1)
+for (i in 2:17) {
+  pHit[i] = pHit[i - 1] + .05
+}
+
+means = c()
+maxes = c()
+mins = c()
+s = c()
+for (i in 1:length(pHit)) {
+  set.seed(2021)
+  for (j in 1:10000) {
+    s[j] = count_sequence(simulate_player(pHit[i]))
+  }
+  means[i] = mean(s)
+  maxes[i] = max(s)
+  mins[i] = min(s)
+}
+plot(pHit, means, ylim = c(0,25), xlim = c(0.0, 1.0), col = "blue", type = "o", pch = 16, xlab = "prob score", ylab = "streak height")
+points(pHit, maxes, col = "green", type = "l", pch = 16, lty = 2)
+points(pHit, mins, col = "red", type = "l", pch = 16, lty = 2)
+legend("topleft", legend = c("mean", "max", "min"), lty = c(1, 2, 2), col = c("blue", "green", "red"), bty = "n")
+```
+
+
